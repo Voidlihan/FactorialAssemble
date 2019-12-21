@@ -26,25 +26,33 @@ namespace Factorial
     {
         public MainWindow()
         {
-            InitializeComponent();
-            LoadAssembly(6);
-            // очистка
-            GC.Collect();
-            GC.WaitForPendingFinalizers();
-
-            foreach (Assembly asm in AppDomain.CurrentDomain.GetAssemblies())
-                Console.WriteLine(asm.GetName().Name);
-
-            Console.Read();
+            InitializeComponent();         
         }
         private void FactorialGet(object sender, RoutedEventArgs e)
         {
+            LoadAssembly(6);
+            GC.Collect();
+            GC.WaitForPendingFinalizers();
+            foreach (Assembly asm in AppDomain.CurrentDomain.GetAssemblies())
+                Console.WriteLine(asm.GetName().Name);
+            Console.Read();
+        }
+        private void LoadAssembly(int number)
+        {
+            var context = new CustomAssemblyLoadContext();
+            context.Unloading += Context_Unloading;
+            var assemblyPath = System.IO.Path.Combine(Directory.GetCurrentDirectory(), "Factorial.dll");
+            Assembly assembly = context.LoadFromAssemblyPath(assemblyPath);
+            var type = assembly.GetType("Factorial.Program");
+            var greetMethod = type.GetMethod("FactorialGet");
             string[] tokens = textBoxFactorial.Text.Split(',');
             var list = new List<int>();
             for (int i = 0; i < 10; i++)
             {
                 if (int.TryParse(tokens[i], out var num))
                 {
+                    var instance = Activator.CreateInstance(type);
+                    int result = (int)greetMethod.Invoke(instance, new object[] { number });
                     list.Add(num);
                 }
             }
@@ -54,34 +62,23 @@ namespace Factorial
                 factorials += FactorialFunc(list[i]).ToString() + "\n";
             }
             MessageBox.Show(factorials);
-        }
-        private static void LoadAssembly(int number)
-        {
-            var context = new CustomAssemblyLoadContext();
-            context.Unloading += Context_Unloading;
-            var assemblyPath = System.IO.Path.Combine(Directory.GetCurrentDirectory(), "FactorialApp.dll");
-            Assembly assembly = context.LoadFromAssemblyPath(assemblyPath);
-            var type = assembly.GetType("FactorialApp.Program");
-            var greetMethod = type.GetMethod("FactorialFunc");
-            var instance = Activator.CreateInstance(type);
-            int result = (int)greetMethod.Invoke(instance, new object[] { number });
-            Console.WriteLine($"Факториал числа {number} равен {result}");
-            foreach (Assembly asm in AppDomain.CurrentDomain.GetAssemblies())
-                Console.WriteLine(asm.GetName().Name);
             context.Unload();
+        }
+
+        private int FactorialFunc(int x)
+        {
+            if (x == 0)
+            {
+                return 1;
+            }
+            else
+            {
+                return x * x - 1;
+            }
         }
         private static void Context_Unloading(AssemblyLoadContext obj)
         {
             Console.WriteLine("Библиотека выгружена \n");
-        }
-    }
-    public class CustomAssemblyLoadContext : AssemblyLoadContext
-    {
-        public CustomAssemblyLoadContext() : base(isCollectible: true) { }
-
-        protected override Assembly Load(AssemblyName assemblyName)
-        {
-            return null;
         }
     }
 }
